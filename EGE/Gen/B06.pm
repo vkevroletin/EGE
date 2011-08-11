@@ -14,7 +14,6 @@ use EGE::Russian::Jobs;
 use Data::Dumper;
 
 use Storable qw(dclone);
-use Switch;
 
 sub all_perm {
     my $rec;
@@ -257,31 +256,26 @@ sub create_questions {
 
 sub genitive { # родительный падеж
     my $name = shift;
-    switch ($name) {
-        case /й$/ { $name =~ s/й$/я/ }
-        case /ь$/ { $name =~ s/ь$/я/ }
-        else { $name .= 'а' };
-    }
+    if ($name =~/й$/) { $name =~ s/й$/я/ }
+    elsif ($name =~ /ь$/) { $name =~ s/ь$/я/ }
+    else { $name .= 'а' };
     $name;
 }
 
 sub ablative { # творительный падеж
     my $name = shift;
-    switch ($name) {
-        case /й$/ { $name =~ s/й$/ем/ }
-        case /ь$/ { $name =~ s/ь$/ем/ }
-        else { $name .= 'ом' };
-    }
+    if ($name =~ /й$/) { $name =~ s/й$/ем/ }
+    elsif ($name =~ /ь$/) { $name =~ s/ь$/ем/ }
+    else { $name .= 'ом' };
     $name;
 }
 
 sub on_right {
-    switch (rnd->in_range(0, 3)) {
-        case 0 { return "$_[1] живет левее  " . genitive($_[0]) }
-        case 1 { return "$_[0] живёт правее " . genitive($_[1]) }
-        case 2 { return "$_[1] живет левее, чем  " . $_[0] }
-        case 3 { return "$_[0] живёт правее, чем " . $_[1] }
-    }
+    $_ = rnd->in_range(0, 3);
+    if ($_ == 0) { return "$_[1] живет левее  " . genitive($_[0]) }
+    elsif ($_ == 1) { return "$_[0] живёт правее " . genitive($_[1]) }
+    elsif ($_ == 2) { return "$_[1] живет левее, чем  " . $_[0] }
+    elsif ($_ == 3) { return "$_[0] живёт правее, чем " . $_[1] }
  }
 
 sub together {
