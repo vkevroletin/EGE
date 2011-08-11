@@ -90,25 +90,23 @@ sub check {
     my ($r) = @_;
 
     my %pos = map { $r->[$_] => $_ } 0 .. 3;
-    for my $i (0 .. $#{$r}) {
-        my ($curr) = $r->[$i];
-        for (keys %{$p->{$curr}}) {
-            return 0 if $i <= $pos{$_};
-        }
-    }
 
-
-    for my $i (0 .. $#{$r}) {
+    for my $i (1 .. $#{$r} - 1) {
         my ($pred, $curr, $nxt) = @{$r}[$i-1 .. $i+1];
         for (keys %{$t->{$curr}}) {
-            unless (($i > 0 && $t->{$curr}{$pred}) ||
-                ($i < $#{$r} && $t->{$curr}{$nxt})) {
+            unless ($_ == $pred || $_ == $nxt) {
                 return 0;
             }
         }
-        if ($i > 0 && $n->{$curr}{$pred} ||
-            $i < $#{$r} && $n->{$curr}{$nxt}) {
+        if ($n->{$curr}{$pred} || $n->{$curr}{$nxt}) {
             return 0;
+        }
+    }
+
+    for my $i (0 .. $#{$r}) {
+        my ($pred, $curr, $nxt) = @{$r}[$i-1 .. $i+1];
+        for (keys %{$p->{$curr}}) {
+             return 0 if $i <= $pos{$_};
         }
         for (keys %{$d_left->{$curr}}) {
             return 0 if $_ <= $i;
