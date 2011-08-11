@@ -33,11 +33,6 @@ sub all_perm {
     $res;
 }
 
-sub push_each {
-    my ($arr, $val) = @_;
-    push @$_, $val for @$arr;
-};
-
 sub unique_pairs {
     my ($n) = @_;
     my @res;
@@ -60,13 +55,13 @@ sub all_pairs {
     @res;
 }
 
-sub AddRelation {
+sub relation_add {
     my ($i, $j, $h, $sym) = @_;
     $h->{$i}{$j} = 1;
     $h->{$j}{$i} = 1 if $sym;
 }
 
-sub RmRelation {
+sub relation_rm {
     my ($i, $j, $h, $sym) = @_;
     delete $h->{$i}{$j};
     delete $h->{$j}{$i} if $sym;
@@ -93,6 +88,16 @@ my @relations = ( [$p, 0], [$t, 1], [$n, 1], [$d_left, 0], [$d_right, 0],
 
 sub check {
     my ($r) = @_;
+
+    my %pos = map { $r->[$_] => $_ } 0 .. 3;
+    for my $i (0 .. $#{$r}) {
+        my ($curr) = $r->[$i];
+        for (keys %{$p->{$curr}}) {
+            return 0 if $i <= $pos{$_};
+        }
+    }
+
+
     for my $i (0 .. $#{$r}) {
         my ($pred, $curr, $nxt) = @{$r}[$i-1 .. $i+1];
         for (keys %{$t->{$curr}}) {
@@ -121,34 +126,17 @@ sub check {
     1;
 }
 
-sub filter { # не учитывется ограничения "правее"
-    my ($r, $t, $n) = @_;
-    grep { check($_, $t, $n) } @$r;
-}
-
-sub total_check {
+sub filter {
     my ($r) = @_;
-    my %pos = map { $r->[$_] => $_ } 0 .. 3;
-    for my $i (0 .. $#{$r}) {
-        my ($curr) = $r->[$i];
-        for (keys %{$p->{$curr}}) {
-            return 0 if $i <= $pos{$_};
-        }
-    }
-    1;
-}
-
-sub total_filter { # учитываются все ограничения
-    my ($r, $t, $n) = @_;
-    grep { total_check($_, $t, $n) && check($_, $t, $n) } @$r;
+    grep { check($_) } @$r;
 }
 
 sub try_new_cond {
     my ($action, $answers) = @_;
-    AddRelation(@$action);
+    relation_add(@$action);
     my @new_ans = filter( $answers );
     if (@new_ans == @$answers || !@new_ans) {
-        RmRelation(@$action);
+        relation_rm(@$action);
     } else {
         @$answers = @new_ans;
     }
@@ -166,10 +154,7 @@ sub create_cond {
         rnd->shuffle(@pairs);
     }
     my @pairs = make_pairs();
-#    my @answers = all_top();
-    my @answers = total_filter( all_perm(0 .. 3) );
-#    print "<pre>", (Dumper \@answers), "</pre>";
-#    print "<pre>", (Dumper all_perm(1, 2, 3, 4)), "</pre>";
+    my @answers = filter( all_perm(0 .. 3) );
     my $ok = !@answers;
     while (!$ok) {
         $ok |= try_new_cond(pop @pairs, \@answers);
@@ -179,7 +164,8 @@ sub create_cond {
     @{$answers[0]};
 }
 
-sub create_init_cond { # создать ограничения "правее"
+sub create_init_cond {
+    # создать ограничения "правее": важно, чтобы не было циклов
     my ($cnt) = @_;
     my @edgees = rnd->pick_n($cnt, unique_pairs(4) );
     for (@edgees) {
@@ -190,16 +176,16 @@ sub create_init_cond { # создать ограничения "правее"
 
 sub clear_cond {
     my $var = all_perm(0 .. 3);
-    my $ans_cnt = total_filter($var);
+    my $ans_cnt = filter($var);
     my $ok = 1;
     while ($ok) {
         $ok = 0;
         for my $rel (@relations) {
             for my $i (0 .. 3) {
                 for my $j (keys %{$rel->[0]->{$i}}) {
-                    RmRelation($i, $j, @$rel);
-                    if (total_filter($var) != $ans_cnt) {
-                        AddRelation($i, $j, @$rel)
+                    relation_rm($i, $j, @$rel);
+                    if (filter($var) != $ans_cnt) {
+                        relation_add($i, $j, @$rel)
                     } else {
                         $ok = 1;
                     }
