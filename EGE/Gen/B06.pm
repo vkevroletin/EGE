@@ -91,38 +91,6 @@ my $d_n = { 0 => {}, 1 => {}, 2 => {}, 3 => {} };
 my @relations = ( [$p, 0], [$t, 1], [$n, 1], [$d_left, 0], [$d_right, 0],
                   [$d_t, 0], [$d_n, 0] );
 
-# Все варианты сделать топологическую сортировку учитывая ограничения "правее"
-# Изначально была идея написать такую процедуру, которая учитывает все
-# ограничения. Идея провалилась, но её происки далее просматриваются в коде.
-sub all_top {
-    our $ans = [];
-
-    my $rec;
-    $rec = sub {
-        my ($path, $results, $n) = @_;
-        unless ($n) {
-            push @$ans, $_ for @$results;
-        }
-        my @to_go = grep { !@{$path->{$_}} } keys %{$path};
-        for my $i (@to_go) {
-            my $nr = dclone($results);
-            my $np = dclone($path);
-            push_each($nr, $i);
-            delete $np->{$i};
-            while (my ($k, $v) = each %{$np}) {
-                $np->{$k} = [ grep { $_ != $i } @$v ];
-            }
-            $rec->($np, $nr, $n - 1);
-        }
-    };
-
-    my %h = map { $_ => [keys %{$p->{$_}}] } 0 .. 3;
-    $rec->(\%h, [[]], 4);
-
-    %h = map { (join ' ', @{$_} ) => $_ } @$ans; # unique ans
-    map { $h{$_} } sort keys %h;
-}
-
 sub check {
     my ($r) = @_;
     for my $i (0 .. $#{$r}) {
@@ -198,7 +166,10 @@ sub create_cond {
         rnd->shuffle(@pairs);
     }
     my @pairs = make_pairs();
-    my @answers = all_top();
+#    my @answers = all_top();
+    my @answers = total_filter( all_perm(0 .. 3) );
+#    print "<pre>", (Dumper \@answers), "</pre>";
+#    print "<pre>", (Dumper all_perm(1, 2, 3, 4)), "</pre>";
     my $ok = !@answers;
     while (!$ok) {
         $ok |= try_new_cond(pop @pairs, \@answers);
