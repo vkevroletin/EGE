@@ -15,6 +15,14 @@ use Data::Dumper;
 
 use Storable qw(dclone);
 
+my %relations = ( ToRight => { v => {},  is_sym => 0 },
+                  Together => { v => {}, is_sym => 1 },
+                  NotTogether => { v => {}, is_sym => 1 },
+                  PosLeft => { v => {}, is_sym => 0 },
+                  PosRight => { v => {}, is_sym => 0 },
+                  Pos => { v => {}, is_sym => 0 },
+                  NotPos => { v => {}, is_sym => 0 } );
+
 sub all_perm {
     my $rec;
     $rec = sub {
@@ -55,69 +63,57 @@ sub all_pairs {
     @res;
 }
 
+sub relation_clear_all {
+    for (keys %relations) {
+        $relations{$_}->{v} = { 0 => {}, 1 => {}, 2 => {}, 3 => {} };
+    }
+}
+
 sub relation_add {
-    my ($i, $j, $h, $sym) = @_;
-    $h->{$i}{$j} = 1;
-    $h->{$j}{$i} = 1 if $sym;
+    my ($i, $j, $r) = @_;
+    $relations{$r}->{v}->{$i}{$j} = 1;
+    $relations{$r}->{v}->{$j}{$i} = 1 if $relations{$r}->{is_sym};
 }
 
 sub relation_rm {
-    my ($i, $j, $h, $sym) = @_;
-    delete $h->{$i}{$j};
-    delete $h->{$j}{$i} if $sym;
+    my ($i, $j, $r) = @_;
+    delete $relations{$r}->{v}->{$i}{$j};
+    delete $relations{$r}->{v}->{$j}{$i} if $relations{$r}->{is_sym};
 }
 
-#(правее какой вершины)
-my $p = { 0 => {}, 1 => {}, 2 => {}, 3 => {} };
-#together
-my $t = { 0 => {}, 1 => {}, 2 => {}, 3 => {} };
-#not together
-my $n = { 0 => {}, 1 => {}, 2 => {}, 3 => {} };
-# ссылки на нижний уровень (левее каких позиций)
-my $d_left = { 0 => {}, 1 => {}, 2 => {}, 3 => {} };
-#(правее каких позиций)
-my $d_right = { 0 => {}, 1 => {}, 2 => {}, 3 => {} };
-#на каком месте
-my $d_t = { 0 => {}, 1 => {}, 2 => {}, 3 => {} };
-#не на каком месте
-my $d_n = { 0 => {}, 1 => {}, 2 => {}, 3 => {} };
-
-# [контейнер, симметричное ли отношение]
-my @relations = ( [$p, 0], [$t, 1], [$n, 1], [$d_left, 0], [$d_right, 0],
-                  [$d_t, 0], [$d_n, 0] );
-
 sub check {
-    my ($r) = @_;
+    my ($c) = @_;
 
-    my %pos = map { $r->[$_] => $_ } 0 .. 3;
+    my %pos = map { $c->[$_] => $_ } 0 .. 3;
 
-    for my $i (1 .. $#{$r} - 1) {
-        my ($pred, $curr, $nxt) = @{$r}[$i-1 .. $i+1];
-        for (keys %{$t->{$curr}}) {
+    for my $i (1 .. $#{$c} - 1) {
+        my ($pred, $curr, $nxt) = @{$c}[$i-1 .. $i+1];
+        for (keys %{$relations{Together}->{v}->{$curr}}) {
             unless ($_ == $pred || $_ == $nxt) {
                 return 0;
             }
         }
-        if ($n->{$curr}{$pred} || $n->{$curr}{$nxt}) {
+        if ($relations{NotTogether}->{v}->{$curr}{$pred} ||
+            $relations{NotTogether}->{v}->{$curr}{$nxt}) {
             return 0;
         }
     }
 
-    for my $i (0 .. $#{$r}) {
-        my ($pred, $curr, $nxt) = @{$r}[$i-1 .. $i+1];
-        for (keys %{$p->{$curr}}) {
+    for my $i (0 .. $#{$c}) {
+        my ($pred, $curr, $nxt) = @{$c}[$i-1 .. $i+1];
+        for (keys %{$relations{ToRight}->{v}->{$curr}}) {
              return 0 if $i <= $pos{$_};
         }
-        for (keys %{$d_left->{$curr}}) {
+        for (keys %{$relations{PosLeft}->{v}->{$curr}}) {
             return 0 if $_ <= $i;
         }
-        for (keys %{$d_right->{$curr}}) {
+        for (keys %{$relations{PosRight}->{v}->{$curr}}) {
             return 0 if $_ >= $i;
         }
-        for (keys %{$d_t->{$curr}}) {
+        for (keys %{$relations{Pos}->{v}->{$curr}}) {
             return 0 if $_ != $i;
         }
-        for (keys %{$d_n->{$curr}}) {
+        for (keys %{$relations{NotPos}->{v}->{$curr}}) {
             return 0 if $_ == $i;
         }
     }
@@ -125,16 +121,16 @@ sub check {
 }
 
 sub filter {
-    my ($r) = @_;
-    grep { check($_) } @$r;
+    my ($c) = @_;
+    grep { check($_) } @$c;
 }
 
 sub try_new_cond {
-    my ($action, $answers) = @_;
-    relation_add(@$action);
+    my ($cond, $answers) = @_;
+    relation_add(@$cond);
     my @new_ans = filter( $answers );
     if (@new_ans == @$answers || !@new_ans) {
-        relation_rm(@$action);
+        relation_rm(@$cond);
     } else {
         @$answers = @new_ans;
     }
@@ -146,8 +142,9 @@ sub create_cond {
     sub make_pairs {
         my @pairs;
         for my $rel (@relations) {
-            my @tmp = $rel->[1] ? unique_pairs(4) : all_pairs(4);
-            push @pairs, [@$_, @$rel] for @tmp;
+            my @tmp = $relations{$rel}->{is_sym} ?
+                          unique_pairs(4) : all_pairs(4);
+            push @pairs, [@$_, $rel] for @tmp;
         }
         rnd->shuffle(@pairs);
     }
@@ -165,25 +162,26 @@ sub create_cond {
 sub create_init_cond {
     # создать ограничения "правее": важно, чтобы не было циклов
     my ($cnt) = @_;
+    relation_clear_all();
     my @edgees = rnd->pick_n($cnt, unique_pairs(4) );
     for (@edgees) {
         my ($i, $j) = @$_;
-        $p->{$j}{$i} = 1;
+        $relations{ToRight}->{v}->{$j}{$i} = 1;
     }
 }
 
 sub clear_cond {
     my $var = all_perm(0 .. 3);
-    my $ans_cnt = filter($var);
+    my $ans_orig = filter($var);
     my $ok = 1;
     while ($ok) {
         $ok = 0;
-        for my $rel (@relations) {
+        for (my ($key, $rel) = each %relations) {
             for my $i (0 .. 3) {
-                for my $j (keys %{$rel->[0]->{$i}}) {
-                    relation_rm($i, $j, @$rel);
-                    if (filter($var) != $ans_cnt) {
-                        relation_add($i, $j, @$rel)
+                for my $j (keys %{$rel->{v}}) {
+                    relation_rm($i, $j, $key);
+                    if (filter($var) != $ans_orig) {
+                        relation_add($i, $j, $key);
                     } else {
                         $ok = 1;
                     }
@@ -196,12 +194,12 @@ sub clear_cond {
 sub create_questions {
     my ($descr) = @_;
     my @cond;
-    for my $j (0 .. $#relations) {
-        my $rel = $relations[$j];
-        for my $i (0 .. 3) {
-            for (keys %{$rel->[0]->{$i}}) {
-                if (!$rel->[1] || $i > $_) {
-                    push @cond, $descr->[$j]->($i, $_)
+    for my $key (keys %relations) {
+        my $rel = $relations{$key};
+        for my $i (keys %{$rel->{v}}) {
+            for my $j (keys %{$rel->{v}->{$i}}) {
+                if (!$rel->{is_sym} || $i > $j) {
+                    push @cond, $descr->{$key}->($i, $j)
                 }
             }
         }
@@ -247,27 +245,30 @@ sub solve {
     my @prof = EGE::Russian::Jobs::different_jobes(4);
 
     create_init_cond(rnd->pick(2, 2, 3));
-    my @prof_order = create_cond(@relations[1 .. 2]);
+    my @prof_order = create_cond('Together', 'NotTogether');
 
-    my @descr = ( sub { on_right($prof[$_[0]], $prof[$_[1]]) },
-                  sub { together($prof[$_[0]], $prof[$_[1]]) },
-                  sub { not_together($prof[$_[0]], $prof[$_[1]]) } );
-    my @cond = create_questions(\@descr);
+    my %descr = (
+        ToRight => sub { on_right($prof[$_[0]], $prof[$_[1]]) },
+        Together => sub { together($prof[$_[0]], $prof[$_[1]]) },
+        NotTogether => sub { not_together($prof[$_[0]], $prof[$_[1]]) }
+    );
+    my @questions = create_questions(\%descr);
 
-    for my $r ($t, $p, $n) { $r->{$_} = {} for (0 .. 3) } #clear conditions
     create_init_cond(rnd->pick(2, 2, 3));
-    my @ans = create_cond(@relations[1 .. $#relations]);
+    my @ans = create_cond(keys %relations);
 
-    @descr = ( sub { on_right($names[$_[0]], $names[$_[1]]) },
-               sub { together($names[$_[0]], $names[$_[1]]) },
-               sub { not_together($names[$_[0]], $names[$_[1]]) },
-               sub { on_right($prof[$prof_order[$_[1]]], $names[$_[0]]) },
-               sub { on_right($names[$_[0]], $prof[$prof_order[$_[1]]]) },
-               sub { "$names[$_[0]] работает " .
-                       ablative($prof[$prof_order[$_[1]]]) },
-               sub { "$names[$_[0]] не работает " .
-                       ablative($prof[$prof_order[$_[1]]]) } );
-    @cond = (@cond, create_questions(\@descr));
+    %descr = (
+        ToRight => sub { on_right($names[$_[0]], $names[$_[1]]) },
+        Together => sub { together($names[$_[0]], $names[$_[1]]) },
+        NotTogether => sub { not_together($names[$_[0]], $names[$_[1]]) },
+        PosLeft => sub { on_right($prof[$prof_order[$_[1]]], $names[$_[0]]) },
+        PosRight => sub { on_right($names[$_[0]], $prof[$prof_order[$_[1]]]) },
+        Pos => sub { "$names[$_[0]] работает " .
+                     ablative($prof[$prof_order[$_[1]]]) },
+        NotPos => sub { "$names[$_[0]] не работает " .
+                        ablative($prof[$prof_order[$_[1]]]) }
+    );
+    @questions = (@questions, create_questions(\%descr));
 
     $self->{text} =
       "На одной улице стоят в ряд 4 дома, в которых живут 4 человека: " .
@@ -278,7 +279,7 @@ sub solve {
       "известно, что:<br/>";
 
     $self->{text} .= "<ol>";
-    $self->{text} .= "<li>$_</li>" for rnd->shuffle(@cond);
+    $self->{text} .= "<li>$_</li>" for rnd->shuffle(@questions);
     $self->{text} .= "</ol>";
 
     my @example = rnd->shuffle(@names);
