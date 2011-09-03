@@ -33,7 +33,7 @@ sub all_perm {
         }
         for my $i (0 .. $#elems) {
             $rec->([@$curr_res, $elems[$i]], $tot_res,
-                     (@elems[0 .. $i - 1], @elems[$i + 1 .. $#elems]));
+                   (@elems[0 .. $i - 1], @elems[$i + 1 .. $#elems]));
         }
     };
     my $res = [];
@@ -100,9 +100,9 @@ sub check {
     }
 
     for my $i (0 .. $#{$c}) {
-        my ($pred, $curr, $nxt) = @{$c}[$i-1 .. $i+1];
+        my $curr = $c->[$i];
         for (keys %{$relations{ToRight}->{v}->{$curr}}) {
-             return 0 if $i <= $pos{$_};
+            return 0 if $i <= $pos{$_};
         }
         for (keys %{$relations{PosLeft}->{v}->{$curr}}) {
             return 0 if $_ <= $i;
@@ -121,20 +121,31 @@ sub check {
 }
 
 sub filter {
-    my ($c) = @_;
-    grep { check($_) } @$c;
+    my ($perm) = @_;
+    grep { check($_) } @$perm;
 }
 
 sub try_new_cond {
     my ($cond, $answers) = @_;
     relation_add(@$cond);
-    my @new_ans = filter( $answers );
+    my @new_ans = filter($answers);
     if (@new_ans == @$answers || !@new_ans) {
         relation_rm(@$cond);
     } else {
         @$answers = @new_ans;
     }
     return @new_ans == 1;
+}
+
+sub create_init_cond {
+    # создать ограничения "правее": важно, чтобы не было циклов
+    my ($cnt) = @_;
+    relation_clear_all();
+    my @edges = rnd->pick_n($cnt, unique_pairs(4) );
+    for (@edges) {
+        my ($i, $j) = @$_;
+        $relations{ToRight}->{v}->{$j}{$i} = 1;
+    }
 }
 
 sub create_cond {
@@ -149,6 +160,7 @@ sub create_cond {
         rnd->shuffle(@pairs);
     }
     my @pairs = make_pairs();
+    create_init_cond(rnd->pick(2, 2, 3));
     my @answers = filter( all_perm(0 .. 3) );
     my $ok = !@answers;
     while (!$ok) {
@@ -159,29 +171,19 @@ sub create_cond {
     @{$answers[0]};
 }
 
-sub create_init_cond {
-    # создать ограничения "правее": важно, чтобы не было циклов
-    my ($cnt) = @_;
-    relation_clear_all();
-    my @edgees = rnd->pick_n($cnt, unique_pairs(4) );
-    for (@edgees) {
-        my ($i, $j) = @$_;
-        $relations{ToRight}->{v}->{$j}{$i} = 1;
-    }
-}
-
 sub clear_cond {
     my $var = all_perm(0 .. 3);
     my $ans_orig = filter($var);
     my $ok = 1;
     while ($ok) {
         $ok = 0;
-        for (my ($key, $rel) = each %relations) {
+        for my $rel (keys %relations) {
             for my $i (0 .. 3) {
-                for my $j (keys %{$rel->{v}}) {
-                    relation_rm($i, $j, $key);
+#                for my $j (keys %{$relations->{$rel}->{v}->{$i}}) {
+                for my $j (keys %{$relations{$rel}->{v}->{$i}}) {
+                    relation_rm($i, $j, $rel);
                     if (filter($var) != $ans_orig) {
-                        relation_add($i, $j, $key);
+                        relation_add($i, $j, $rel);
                     } else {
                         $ok = 1;
                     }
@@ -244,7 +246,6 @@ sub solve {
     my @names = EGE::Russian::Names::different_males(4);
     my @prof = EGE::Russian::Jobs::different_jobes(4);
 
-    create_init_cond(rnd->pick(2, 2, 3));
     my @prof_order = create_cond('Together', 'NotTogether');
 
     my %descr = (
@@ -254,7 +255,6 @@ sub solve {
     );
     my @questions = create_questions(\%descr);
 
-    create_init_cond(rnd->pick(2, 2, 3));
     my @ans = create_cond(keys %relations);
 
     %descr = (
