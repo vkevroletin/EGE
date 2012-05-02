@@ -295,4 +295,45 @@ sub solve {
     $self->{correct} = join '',  map { substr($names[$_], 0, 1) } @ans;
 }
 
+sub _lin_comb {
+    my ($c1, $c2) = @_;
+    if ($c1 < 0 && $c2 > 0) {
+        ($a, $b, $c1, $c2) = ('b', 'a', $c2, $c1)
+    } else {
+        ($a, $b) = ('a', 'b')
+    }
+    [($c2 > 0 ? '+' : '-'),
+        ($c1 == 1 ? $a : $c1 == -1 ? ['-', $a] : ['*', $c1, $a]),
+        (abs($c2) == 1 ? $b : ['*', abs($c2), $b])]
+}
+
+sub _rand_lin_comb {
+    _lin_comb((rnd->coin() ? 1 : -1) * rnd->in_range(1, 2),
+              (rnd->coin() ? 1 : -1) * rnd->in_range(1, 2))
+}
+
+sub arith_with_if {
+    my ($self) = @_;
+    my ($a_val, $b_val) = map { rnd->in_range(-10, 10)*10 } 1, 2;
+    my $op = rnd->pick('>', '>=', '<', '<=', '==', '!=');
+    my ($lc1, $lc2); do {
+        ($lc1, $lc2) = map { _rand_lin_comb() } 1, 2
+    } while ($lc1 == $lc2);
+    $b = EGE::Prog::make_block([
+        '=', 'a', $a_val,
+        '=', 'b', $b_val,
+        '=', (rnd->coin() ? 'a' : 'b'), _rand_lin_comb(),
+        'if_else', [$op, 'a', 'b'], [
+            '=', 'c', $lc1
+        ], [
+            '=', 'c', $lc2
+        ],
+    ]);
+    $self->{correct} = $b->run_val('c');
+    my $lt = EGE::LangTable::table($b, [ [ 'Basic', 'Pascal' ], [ 'C', 'Alg', 'Perl' ] ]);
+    $self->{text} = 'Определите значение переменной <strong>c</strong> после ' .
+        'выполнения следующего фрагмента программы (записанного ниже на ' .
+        'разных языках программирования).' . $lt;
+}
+
 1;
