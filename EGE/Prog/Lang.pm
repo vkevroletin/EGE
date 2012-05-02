@@ -71,6 +71,7 @@ sub for_start_fmt { "FOR %s = %s TO %s\n" }
 sub for_end_fmt { "\nNEXT %1\$s" }
 
 sub if_start_fmt { 'IF %s THEN' . ($_[1] ? "\n" : ' ') }
+sub if_else_fmt { "\nELSE" . ($_[2] ? "\n" : ' ') }
 sub if_end_fmt { $_[1] ? "\nEND IF" : '' }
 
 sub while_start_fmt { "DO WHILE %s\n" }
@@ -92,6 +93,7 @@ sub for_start_fmt {
 sub for_end_fmt { $_[1] ? "\n}" : '' }
 
 sub if_start_fmt { 'if (%s)' . ($_[1] ? " {\n" : "\n") }
+sub if_else_fmt { ($_[1] ? "\n} " : "\n") . 'else' . ($_[2] ? " {\n" : "\n") }
 sub if_end_fmt { $_[1] ? "\n}" : '' }
 
 sub while_start_fmt { 'while (%s)' . ($_[1] ? " {\n" : "\n") }
@@ -117,6 +119,7 @@ sub for_start_fmt { 'for %s := %s to %s do' . ($_[1] ? ' begin' : '') . "\n" }
 sub for_end_fmt { $_[1] ? "\nend;" : '' }
 
 sub if_start_fmt { 'if %s then' . ($_[1] ? " begin\n" : "\n") }
+sub if_else_fmt { ($_[1] ? "\nend\n" : "\n") . 'else' . ($_[2] ? " begin\n" : "\n") }
 sub if_end_fmt { $_[1] ? "\nend;" : '' }
 
 sub while_start_fmt { 'while %s do' . ($_[1] ? " begin\n" : "\n") }
@@ -141,6 +144,7 @@ sub for_start_fmt { "нц для %s от %s до %s\n" }
 sub for_end_fmt { "\nкц" }
 
 sub if_start_fmt { "если %s то\n" }
+sub if_else_fmt { "\nиначе\n" }
 sub if_end_fmt { "\nвсе" }
 
 sub while_start_fmt { "пока %s нц\n" }
@@ -161,6 +165,7 @@ sub for_start_fmt { 'for (%s = %2$s; %1$s <= %3$s; ++%1$s) {' . "\n" }
 sub for_end_fmt { "\n}" }
 
 sub if_start_fmt { "if (%s) {\n" }
+sub if_else_fmt { "\n} else {\n" }
 sub if_end_fmt { "\n}" }
 
 sub while_start_fmt { "while (%s) {\n" }

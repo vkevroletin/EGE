@@ -257,6 +257,35 @@ sub run {
     $self->{body}->run($env) if $self->{cond}->run($env);
 }
 
+package EGE::Prog::IfThenElse;
+use base 'EGE::Prog::IfThen';
+
+sub to_lang {
+    my ($self, $lang) = @_;
+    my $body_is_block = @{$self->{body}->{statements}} > 1;
+    my $else_is_block = @{$self->{else_body}->{statements}} > 1;
+
+    my $fmt_start = $lang->if_start_fmt($body_is_block);
+    my $fmt_else  = $lang->if_else_fmt($body_is_block, $else_is_block);
+    my $fmt_end   = $lang->if_end_fmt($else_is_block);
+    my $body = $self->{body}->to_lang($lang);
+    my $else = $self->{else_body}->to_lang($lang);
+    $body =~ s/^/  /mg if $fmt_start =~ /\n$/; # отступы
+    $else =~ s/^/  /mg if $fmt_else =~ /\n$/;
+    sprintf
+        $fmt_start . '%2$s' . $fmt_else . '%3$s' . $fmt_end,
+        $self->{cond}->to_lang($lang), $body, $else;
+}
+
+sub run {
+    my ($self, $env) = @_;
+    if ($self->{cond}->run($env)) {
+        $self->{body}->run($env)
+    } else {
+        $self->{else_body}->run($env)
+    }
+}
+
 package EGE::Prog::CondLoop;
 use base 'EGE::Prog::CompoundStatement';
 
@@ -338,6 +367,7 @@ sub statements_descr {{
     '=' => { type => 'Assign', args => [qw(E_var E_expr)] },
     'for' => { type => 'ForLoop', args => [qw(E_var E_lb E_ub B_body)] },
     'if' => { type => 'IfThen', args => [qw(E_cond B_body)] },
+    'if_else' => { type => 'IfThenElse', args => [qw(E_cond B_body B_else_body)] },
     'while' => { type => 'While', args => [qw(E_cond B_body)] },
     'until' => { type => 'Until', args => [qw(E_cond B_body)] },
 }}
